@@ -541,7 +541,7 @@ mark.hl{background:color-mix(in srgb,#ffd84d 55%,transparent);color:inherit;bord
 <header class="app-header">
   <div class="brand">
     <div class="brand-mark">契</div>
-    <div style="min-width:0"><h1>계약관리도구<span class="ver">v1.4.1</span></h1><small>통계 · 시각화 · 감사자료 · 읽기전용 취합</small></div>
+    <div style="min-width:0"><h1>계약관리도구<span class="ver">v1.5.1</span></h1><small>통계 · 시각화 · 감사자료 · 읽기전용 취합</small></div>
   </div>
   <button type="button" class="header-search" id="paletteBtn" title="검색·명령 (Ctrl+K)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="hs-text">계약 검색 · 메뉴 이동 · 작업 실행</span><span class="kbd">Ctrl K</span></button>
   <div class="header-meta">
@@ -755,7 +755,7 @@ mark.hl{background:color-mix(in srgb,#ffd84d 55%,transparent);color:inherit;bord
       <div class="stats-chart-grid mb12" id="statsCharts"></div>
       <div class="grid cols-2 mb12">
         <div class="card card-pad"><h3 class="card-title">감사자료 컬럼 · 순서</h3><div class="help mb8">체크된 순서대로 XLSX에 출력합니다. 단가 또는 금액 미확인 행이 있으면 ‘금액방식’ 컬럼은 자동으로 강제 포함됩니다.</div><div id="reportColumnList" class="column-list"></div></div>
-        <div class="card card-pad"><h3 class="card-title">조회·출력 설명</h3><div id="statsWarnings" class="validation warn"></div><div class="help mt12">XLSX는 조회조건·기준일·금액단위·미확인 건수·대표 미지정 그룹 수를 ‘조회조건’ 시트에 기록하며, 날짜는 날짜형·금액은 숫자형으로 출력합니다. 예산편성부서 다중연결은 한 셀에 병합 표시하여 계약금액을 중복 집계하지 않습니다.</div></div>
+        <div class="card card-pad"><h3 class="card-title">조회·출력 설명</h3><div id="statsWarnings" class="validation warn"></div><div class="help mt12">XLSX는 조회조건·기준일·금액단위·미확인 건수·대표 미지정 그룹 수를 ‘조회조건’ 시트에 기록하며, 날짜는 날짜형·금액은 숫자형으로 출력합니다. 예산편성부서 다중연결은 감사자료 시트에서 한 셀에 병합 표시하여 계약금액을 중복 집계하지 않고, 부서별 관련금액은 ‘집계_예산부서(중복포함)’ 시트에 중복 포함으로 따로 표시합니다. 조회조건 시트에는 통계 대상·적용 필터·제외 건수도 기록합니다.</div></div>
       </div>
       <div class="card">
         <div class="toolbar"><strong>감사자료 미리보기</strong><span class="muted" id="statsPreviewInfo"></span></div>
@@ -985,7 +985,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 (() => {
 'use strict';
 /* 계약관리도구 2단계 — 모듈 00: 상수·공통 유틸 (build.py가 IIFE로 결합) */
-const APP_VERSION = '1.4.0-stage5';
+const APP_VERSION = '1.5.1-stage5';
 const SCHEMA_VERSION = '1.0.0';
 const MAX_JSON_BYTES = 25 * 1024 * 1024;
 const MAX_XLSX_BYTES = 25 * 1024 * 1024;
@@ -2291,7 +2291,7 @@ function stage4VersionStatus(review,sourceDoc){
     }else if(review.applicationDate<'2020-11-16')hint='2020-11-16 이전 협상요령 후보';
     return {status:'check',text:`${hint}. 이번 첨부에는 해당 당시 전체 원문이 없어 적용버전 미확정으로 유지합니다.`};
   }
-  if(['contract','renewal','manual'].includes(review.applicationEvent)&&!String(review.applicationBasis||'').trim())return {status:'check',text:'공고 외 기준 사건을 선택했습니다. 해당 기준일을 적용하는 근거 메모를 확인하세요.'};
+  if(['quoteRequest','contract','renewal','manual'].includes(review.applicationEvent)&&!String(review.applicationBasis||'').trim())return {status:'check',text:'공고 외 기준 사건을 선택했습니다. 견적요청일 등 해당 기준일을 적용하는 근거 메모를 확인하세요(날짜만으로 적용 규정을 확정하지 않음).'};
   return {status:'reference',text:`현행 첨부본 적용 후보(${current} 이후). 적용업무·부칙·소관부서 확인은 별도 기록합니다.`};
 }
 function stage4Review(c){return c?.regulationReview||{};}
@@ -2424,7 +2424,7 @@ function stage5XmlEsc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;
 function stage5ColName(n){let s='';for(let x=n+1;x;x=Math.floor((x-1)/26))s=String.fromCharCode(65+(x-1)%26)+s;return s;}
 function stage5ExcelDate(s){const p=parseDateOnly(s);if(!p)return null;return Math.round((p.dt-Date.UTC(1899,11,30))/86400000);}
 function stage5SheetName(name,used){let n=String(name||'Sheet').replace(/[\\/?*\[\]:]/g,'_').slice(0,31)||'Sheet';let base=n,i=2;while(used.has(n))n=(base.slice(0,28)+'_'+i++).slice(0,31);used.add(n);return n;}
-function stage5CellXml(v,r,c,kind='text',header=false){const ref=stage5ColName(c)+(r+1);if(v==null||v==='')return `<c r="${ref}"/>`;if(header)return `<c r="${ref}" s="1" t="inlineStr"><is><t xml:space="preserve">${stage5XmlEsc(v)}</t></is></c>`;if(kind==='number'&&Number.isFinite(Number(v)))return `<c r="${ref}" s="3"><v>${Number(v)}</v></c>`;if(kind==='date'){const d=stage5ExcelDate(String(v));if(d!=null)return `<c r="${ref}" s="2"><v>${d}</v></c>`;}return `<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${stage5XmlEsc(v)}</t></is></c>`;}
+function stage5CellXml(v,r,c,kind='text',header=false){const ref=stage5ColName(c)+(r+1);if(v==null||v==='')return `<c r="${ref}"/>`;if(header)return `<c r="${ref}" s="1" t="inlineStr"><is><t xml:space="preserve">${stage5XmlEsc(v)}</t></is></c>`;if((kind==='number'||kind==='number3'||kind==='number6')&&Number.isFinite(Number(v)))return `<c r="${ref}" s="${kind==='number3'?4:kind==='number6'?5:3}"><v>${Number(v)}</v></c>`;if(kind==='date'){const d=stage5ExcelDate(String(v));if(d!=null)return `<c r="${ref}" s="2"><v>${d}</v></c>`;}return `<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${stage5XmlEsc(v)}</t></is></c>`;}
 function stage5SheetXml(sheet){const rows=sheet.rows||[],types=sheet.types||[];let xml='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"/></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>';const widths=sheet.widths||[];for(let i=0;i<Math.max(widths.length,(rows[0]||[]).length);i++)xml+=`<col min="${i+1}" max="${i+1}" width="${widths[i]||18}" customWidth="1"/>`;xml+='</cols><sheetData>';for(let r=0;r<rows.length;r++){xml+=`<row r="${r+1}">`;for(let c=0;c<rows[r].length;c++)xml+=stage5CellXml(rows[r][c],r,c,types[c]||'text',r===0&&sheet.header!==false);xml+='</row>';}xml+='</sheetData><autoFilter ref="A1:'+stage5ColName(Math.max(0,(rows[0]||[]).length-1))+Math.max(1,rows.length)+'"/></worksheet>';return xml;}
 async function stage5BuildXlsx(sheets,type='blob'){
   const zip=new JSZip(),used=new Set(),names=sheets.map(s=>stage5SheetName(s.name,used));
@@ -2432,7 +2432,7 @@ async function stage5BuildXlsx(sheets,type='blob'){
   zip.folder('_rels').file('.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
   zip.folder('xl').file('workbook.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>'+names.map((n,i)=>`<sheet name="${stage5XmlEsc(n)}" sheetId="${i+1}" r:id="rId${i+1}"/>`).join('')+'</sheets></workbook>');
   zip.folder('xl').folder('_rels').file('workbook.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+sheets.map((_,i)=>`<Relationship Id="rId${i+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join('')+`<Relationship Id="rId${sheets.length+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`);
-  zip.folder('xl').file('styles.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="yyyy-mm-dd"/></numFmts><fonts count="2"><font><sz val="11"/><name val="맑은 고딕"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="맑은 고딕"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1F4E78"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="4"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFill="1" applyFont="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="3" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>');
+  zip.folder('xl').file('styles.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="3"><numFmt numFmtId="164" formatCode="yyyy-mm-dd"/><numFmt numFmtId="165" formatCode="#,##0.###"/><numFmt numFmtId="166" formatCode="#,##0.######"/></numFmts><fonts count="2"><font><sz val="11"/><name val="맑은 고딕"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="맑은 고딕"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1F4E78"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="6"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFill="1" applyFont="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="3" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="166" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>');
   const ws=zip.folder('xl').folder('worksheets');sheets.forEach((s,i)=>ws.file('sheet'+(i+1)+'.xml',stage5SheetXml(s)));
   return zip.generateAsync({type,compression:'DEFLATE',compressionOptions:{level:6}});
 }
@@ -2489,6 +2489,436 @@ newDataset=function(){_stage4NewDataset();stage5StatsHydratedDataset=null;stage5
 const _stage4Boot=boot;
 boot=async function(){await _stage4Boot();stage5EnsureState(state);state.appVersion=APP_VERSION;state.contentHash=await computeContentHash(state);stage5HydrateStats(true);if(window.__CM_TEST__)Object.assign(window.__CM_TEST__,{stage5SelectRows:(settings,doc)=>deepClone(stage5SelectRows(settings||stage5DefaultReportSettings(),doc||state)),stage5Aggregate:(rows,field)=>deepClone(stage5Aggregate(rows,field)),stage5Stats:rows=>deepClone(stage5Stats(rows)),stage5AuditSheets:(rows,settings,meta)=>deepClone(stage5AuditSheets(rows,settings||stage5DefaultReportSettings(),meta||{})),stage5BuildXlsxBytes:sheets=>stage5BuildXlsx(sheets,'uint8array'),stage5CollectionPayload:doc=>stage5CollectionPayloadFromDoc(doc||state),stage5BlankDocument:()=>stage5BlankDocument(),stage5CollectionAnalysis:()=>deepClone(stage5CollectionAnalysis()),stage5ValidateExtensions:d=>deepClone(stage5ValidateExtensions(d)),stage5SetCollectionSourcesForTest:arr=>{stage5CollectionSources=deepClone(arr||[]);return stage5CollectionSources.length;},stage5SetCollectionSelectionForTest:(datasetId,snapshotId)=>{state.collectionSettings.selectedSnapshots[datasetId]=snapshotId;return true;},stage5SetDuplicateDecisionForTest:(key,decision,reason='test')=>{state.collectionSettings.duplicateDecisions[key]={decision,reason,updatedAt:nowIso()};return true;},stage5ClearCollectionSettingsForTest:()=>{state.collectionSettings=stage5DefaultCollectionSettings();return true;},stage5DefaultReportSettings:()=>deepClone(stage5DefaultReportSettings())});};
 
+
+
+/* ==========================================================
+   모듈 96: 1.5.0 보완 (5단계 검증 결과 반영)
+   - T22 빈 배포본 실데이터 잔존 차단(최초 정적 DOM 사용 + 잔존 검사)
+   - T13 협상 기술평가 항목별 30% 한도
+   - 설계 5.5 기본 통계 대상(취소·일반 초안 제외, 이관 검토대기 별도 표시)
+   - 설계 8.6 출력물 조회조건·제외 건수, 취합 출처·제외내역 시트
+   - T21 예산편성부서별 관련금액(중복 포함) 집계
+   - T20 취합 중복 후보 확대(기관 계약번호·기간 일치+사업명 유사)
+   - 내장 라이브러리 목록·무결성 확인
+   - 기존 함수는 감싸서 확장하며, 2~5단계 데이터 형식은 그대로 읽는다.
+   ========================================================== */
+const S96_PRISTINE=document.documentElement.cloneNode(true);
+const S96_SCOPE_LABELS={base:'기본(확정 + 이관 검토대기, 취소·일반 초안 제외)',confirmed:'확정만',all:'전체(초안·취소 포함, 휴지통 제외)'};
+const S96_LIBS=[
+  {name:'Pretendard Variable',version:'파일 내 버전 표기 없음(woff2 내장)',license:'SIL Open Font License 1.1',source:'github.com/orioncactus/pretendard',kind:'font',sha256:'81d85de1db805e9f30b40b6dbddcf2c7c0a37e84e3d92cb72df4abeb43818bc1'},
+  {name:'Chart.js',version:'4.5.1',license:'MIT',source:'chartjs.org',kind:'chart',sha256:'e19e30cf6dc5136892e89919cb671b6e30a9f3acc53052735a028fd7dbc2c84e'},
+  {name:'JSZip (pako 포함)',version:'3.10.1',license:'MIT 또는 GPLv3 이중 라이선스 / pako MIT',source:'stuk.github.io/jszip',kind:'jszip',sha256:'a67fe933b7b365f6b4d976637caf066e0a869db47143b7f7e04235e054f524be'}
+];
+
+/* ---------- 공통 ---------- */
+function s96ScopeFilter(rows,scope){
+  const counts={cancelled:0,draft:0,importReview:0,draftUnknown:0};const out=[];
+  for(const r of rows){
+    if(scope==='all'){out.push(r);continue;}
+    const code=r.recordStatusCode;
+    if(code==='cancelled'){counts.cancelled++;continue;}
+    if(code==='draft'){
+      if(scope==='confirmed'){counts.draft++;continue;}
+      if(r.importReview){counts.importReview++;out.push(r);continue;}
+      if(r.draftOriginUnknown){counts.draftUnknown++;out.push(r);continue;}
+      counts.draft++;continue;
+    }
+    out.push(r);
+  }
+  return {rows:out,counts};
+}
+function s96ScopeText(sel){
+  const c=sel.scopeCounts||{};const parts=[`통계 대상: ${S96_SCOPE_LABELS[sel.scope]||sel.scope}`];
+  if(sel.scope!=='all')parts.push(`이관 검토대기 ${c.importReview||0}건 포함`);
+  if(c.draftUnknown)parts.push(`출처 구분 불가 초안 ${c.draftUnknown}건 포함`);
+  parts.push(`제외: 초안 ${c.draft||0} · 취소 ${c.cancelled||0} · 휴지통 ${c.trash||0}`);
+  return parts.join(' · ');
+}
+const S96_FILTER_LABELS={yearFrom:'시작연도(부터)',yearTo:'시작연도(까지)',team:'팀',counterparty:'업체',contractType:'계약대상',method:'계약방법',recordStatus:'기록상태',execution:'이행상태'};
+function s96FilterText(f={}){const xs=Object.entries(f).filter(([,v])=>v).map(([k,v])=>`${S96_FILTER_LABELS[k]||k}=${k==='recordStatus'?(RECORD_LABELS[v]||v):k==='execution'?(EXEC_LABELS[v]||v):v}`);return xs.join(', ')||'없음';}
+function s96BudgetRows(rows){const out=[];for(const r of rows){const list=Array.isArray(r.budgetList)&&r.budgetList.length?r.budgetList:['(예산부서 미지정)'];for(const b of list)out.push({...r,_budget:b});}return out;}
+function s96AmountType(unit){return unit==='thousand'?'number3':unit==='million'?'number6':'number';}
+function s96Norm(v){return String(v||'').toLowerCase().replace(/[\s㈜()（）\[\]·.,\-_/]|주식회사/g,'');}
+function s96Bigrams(s){const a=[];for(let i=0;i<s.length-1;i++)a.push(s.slice(i,i+2));return a;}
+function s96Dice(a,b){a=s96Norm(a);b=s96Norm(b);if(!a||!b)return 0;if(a===b)return 1;const x=s96Bigrams(a),y=s96Bigrams(b);if(!x.length||!y.length)return 0;const m=new Map();for(const g of x)m.set(g,(m.get(g)||0)+1);let hit=0;for(const g of y){const n=m.get(g);if(n){hit++;m.set(g,n-1);}}return 2*hit/(x.length+y.length);}
+
+/* ---------- 1) 행 확장: 이관 검토대기 구분·예산부서 배열·공통키 ---------- */
+const _s96RowFromContract=stage5RowFromContract;
+stage5RowFromContract=function(c,doc=state,sourceMeta=null){
+  const row=_s96RowFromContract(c,doc,sourceMeta);
+  const imported=c.importStatus==='review'||c.source?.type==='xlsx';
+  row.importReview=c.recordStatus==='draft'&&imported;
+  row.draftOriginUnknown=c.recordStatus==='draft'&&c.importStatus===undefined&&!c.source&&c.__collectionLegacy===true;
+  row.globalContractKey=c.globalContractKey||'';
+  const links=(doc.contractBudgetLinks||[]).filter(x=>x.contractId===c.id);const names=[];
+  for(const x of links){const n=stage5MasterNameFrom(doc,x.budgetSubjectId,x.budgetSubjectNameAtContract||'');if(n&&!names.includes(n))names.push(n);}
+  if(c.budgetSubjectOtherText&&!names.includes(c.budgetSubjectOtherText))names.push(c.budgetSubjectOtherText);
+  row.budgetList=names;
+  return row;
+};
+
+/* ---------- 2) 통계 대상 범위(설계 5.5) ---------- */
+const _s96DefaultReport=stage5DefaultReportSettings;
+stage5DefaultReportSettings=function(){return {..._s96DefaultReport(),scope:'base'};};
+const _s96EnsureState=stage5EnsureState;
+stage5EnsureState=function(doc=state){_s96EnsureState(doc);const r=doc.reportSettings;if(!S96_SCOPE_LABELS[r.scope])r.scope='base';return doc;};
+const _s96CurrentUi=stage5CurrentUiSettings;
+stage5CurrentUiSettings=function(){return {..._s96CurrentUi(),scope:$('#statsScope')?.value||'base'};};
+const _s96SelectRows=stage5SelectRows;
+stage5SelectRows=function(settings=stage5CurrentUiSettings(),doc=state){
+  const base=_s96SelectRows(settings,doc);
+  const scope=settings.filters?.recordStatus?'all':(S96_SCOPE_LABELS[settings.scope]?settings.scope:'base');
+  const r=s96ScopeFilter(base.rows,scope);
+  return {...base,rows:r.rows,scope,scopeCounts:{...r.counts,trash:(doc.contracts||[]).filter(c=>c.recordStatus==='trash').length}};
+};
+const _s96Hydrate=stage5HydrateStats;
+stage5HydrateStats=function(force=false){const will=force||stage5StatsHydratedDataset!==state.datasetId;_s96Hydrate(force);if(will){stage5EnsureState();const el=$('#statsScope');if(el)el.value=state.reportSettings.scope||'base';}};
+const _s96ResetStats=stage5ResetStats;
+stage5ResetStats=function(){const el=$('#statsScope');if(el)el.value='base';_s96ResetStats();};
+const _s96RenderStatistics=stage5RenderStatistics;
+stage5RenderStatistics=function(){
+  _s96RenderStatistics();
+  const settings=stage5CurrentUiSettings(),sel=stage5SelectRows(settings);
+  const b=$('#statsBasisText');if(b)b.textContent=`${b.textContent} · ${s96ScopeText(sel)}`;
+  const note=$('#statsScopeNote');if(note)note.textContent=settings.filters?.recordStatus?'기록상태 필터를 지정하면 통계 대상 범위는 적용하지 않습니다.':'';
+};
+
+/* ---------- 3) 차트: 시작연도 표기 + 예산편성부서(중복 포함) ---------- */
+stage5RenderCharts=function(target,rows,unit){
+  target.innerHTML='';
+  for(const [t,f] of [['시작연도별','year'],['팀별','team'],['업체별','counterparty'],['계약대상별','contractType'],['계약방법별','method'],['이행상태별','executionStatus']])target.appendChild(stage5RenderChartCard(t,rows,f,unit,t==='업체별'?10:8));
+  const card=stage5RenderChartCard('예산편성부서별 관련금액',s96BudgetRows(rows),'_budget',unit,10);
+  const n=card.querySelector('.chart-note');if(n)n.textContent='한 계약이 여러 부서에 연결되면 각 부서에 전액 표시(중복 포함). 부서 합계를 더하면 총액을 초과하므로 합산하지 마세요.';
+  target.appendChild(card);
+};
+
+/* ---------- 4) XLSX: 조회조건·제외 건수·예산부서 시트·천원/백만원 소수 서식 ---------- */
+const _s96AuditSheets=stage5AuditSheets;
+stage5AuditSheets=function(rows,settings,meta={}){
+  const unit=settings.amountUnit||'won';const sheets=_s96AuditSheets(rows,settings,meta);
+  const info=sheets[0].rows;const idx=info.findIndex(r=>r[0]==='조회범위');
+  if(idx>0&&(info[idx][1]==='history'||info[idx][1]==='representative'))info[idx][1]=info[idx][1]==='history'?'원본 이력':'사업별 대표';
+  const extra=[...(meta.extra||[]),['연도 기준','계약 시작일의 연도(체결연도 아님)'],['예산편성부서 집계','부서 간 중복 포함 — 부서 합계를 더하면 총액을 초과함']];
+  info.splice(idx>0?idx+1:info.length,0,...extra);
+  const audit=sheets.find(s=>s.name==='감사자료');if(audit){const cols=audit.rows[0]||[];const k=cols.findIndex(h=>String(h).startsWith('계약금액('));if(k>=0)audit.types[k]=s96AmountType(unit);}
+  for(const s of sheets){if(s.name==='집계_연도'){s.name='집계_시작연도';s.rows[0][0]='시작연도';}if(s.name.startsWith('집계_'))s.types[3]=s96AmountType(unit);}
+  const bs=stage5AggregateSheet('집계_예산부서(중복포함)',s96BudgetRows(rows),'_budget',unit);bs.types[3]=s96AmountType(unit);
+  bs.rows[0][0]='예산편성부서';bs.rows[0][3]=bs.rows[0][3].replace('확정금액합계','관련 확정금액(중복 포함)');
+  bs.rows.push([]);bs.rows.push(['주의: 한 계약이 여러 예산부서에 연결되면 각 부서에 전액 계상됩니다. 이 시트의 금액 합계는 계약 총액이 아닙니다.']);
+  sheets.push(bs);
+  return sheets;
+};
+stage5ExportAudit=async function(){
+  const settings=stage5CurrentUiSettings(),sel=stage5SelectRows(settings),c=sel.scopeCounts||{};
+  const extra=[['통계 대상',S96_SCOPE_LABELS[sel.scope]||sel.scope],['적용 필터',s96FilterText(settings.filters)],['제외 건수',`휴지통 ${c.trash||0} · 취소 ${c.cancelled||0} · 초안 ${c.draft||0}`],['이관 검토대기 포함',sel.scope==='all'?'범위 미적용':(c.importReview||0)]];
+  const sheets=stage5AuditSheets(sel.rows,settings,{outputType:'감사자료',scopeText:settings.viewMode==='history'?'원본 이력':'사업별 대표',unresolvedRepresentativeGroups:sel.unresolvedRepresentativeGroups.length,extra});
+  await stage5DownloadXlsx(sheets,`계약관리_감사자료_${sanitizeFilenamePart(masterById(state.ownerOrgId)?.name||'부서')}_${localDateISO()}.xlsx`);
+};
+
+/* ---------- 5) 취합: 공통키·이관상태 전달, 중복 후보 확대, 제외내역 ---------- */
+const _s96CollectionContract=stage5CollectionContract;
+stage5CollectionContract=function(c,doc){return {..._s96CollectionContract(c,doc),globalContractKey:c.globalContractKey||'',importStatus:c.importStatus||(c.source?.type==='xlsx'?'review':'manual')};};
+function s96DuplicateReason(a,b){
+  const reasons=[];let strong=false;
+  if(a.globalContractKey&&b.globalContractKey&&s96Norm(a.globalContractKey)===s96Norm(b.globalContractKey)){reasons.push('기관 계약번호 일치');strong=true;}
+  if(a.startDate&&a.startDate===b.startDate&&a.endDate&&a.endDate===b.endDate){
+    const sim=s96Dice(a.contractName,b.contractName),aOk=Number.isSafeInteger(a.totalAmount),bOk=Number.isSafeInteger(b.totalAmount),amtEq=aOk&&bOk&&a.totalAmount===b.totalAmount,amtUnknown=!aOk||!bOk;
+    if(sim===1&&amtEq)reasons.push('사업명·기간·금액 일치');
+    else if(sim>=0.5&&(amtEq||amtUnknown))reasons.push(`기간 일치 · 사업명 유사 ${Math.round(sim*100)}% · ${amtEq?'금액 일치':'금액 미확인 포함'}`);
+    else if(sim>=0.7)reasons.push(`기간 일치 · 사업명 유사 ${Math.round(sim*100)}% · 금액 상이`);
+  }
+  return {reasons,strong};
+}
+stage5CollectionAnalysis=function(){
+  stage5EnsureState();const groups=stage5CollectionGroups(),selected=[],issues=[],sourceStatus=[];
+  for(const [ds,list] of groups){
+    const bySnap=new Map();for(const s of list){if(!bySnap.has(s.snapshotId))bySnap.set(s.snapshotId,[]);bySnap.get(s.snapshotId).push(s);}
+    let integrityConflict=false;for(const [snap,arr] of bySnap){if(new Set(arr.map(x=>x.contentHash)).size>1){integrityConflict=true;issues.push({type:'integrity',datasetId:ds,snapshotId:snap,text:`동일 snapshotId(${shortId(snap)})인데 contentHash가 다릅니다.`});}}
+    const unique=[...bySnap.values()].map(arr=>arr[0]);let chosen=null;
+    if(!integrityConflict){if(unique.length===1)chosen=unique[0];else{const saved=state.collectionSettings.selectedSnapshots[ds];chosen=unique.find(x=>x.snapshotId===saved)||null;if(!chosen)issues.push({type:'version',datasetId:ds,text:`서로 다른 snapshot ${unique.length}개 중 대표 버전을 선택하세요.`});const parents=new Map();for(const x of unique){const p=x.parentSnapshotId||'(없음)';if(!parents.has(p))parents.set(p,[]);parents.get(p).push(x);}for(const [p,a] of parents)if(p!=='(없음)'&&a.length>1)issues.push({type:'branch',datasetId:ds,text:`같은 부모 ${shortId(p)}에서 갈라진 분기 ${a.length}개입니다. 자동 최신본을 선택하지 않습니다.`});}}
+    if(chosen)selected.push(chosen);sourceStatus.push({datasetId:ds,unique,chosen,integrityConflict});
+  }
+  const multi=selected.length>1,rows=[];
+  for(const s of selected){
+    const doc={referenceDate:s.referenceDate,masterData:s.masterData,contractBudgetLinks:[],contractGroups:[]};
+    for(const c of s.contracts){
+      const fake={...c,budgetSubjectOtherText:null,__collectionLegacy:c.importStatus===undefined};
+      const row=stage5RowFromContract(fake,doc,{datasetId:s.datasetId,snapshotId:s.snapshotId,contentHash:s.contentHash,fileName:s.fileName});
+      if(c.budgetSubjects){row.budgetSubjects=c.budgetSubjects;row.budgetList=String(c.budgetSubjects).split(/\s*,\s*/).filter(Boolean);}
+      if(c.importStatus===undefined&&c.recordStatus==='draft')row.draftOriginUnknown=true;
+      row.sourceInfo=`${s.ownerOrgName||'-'} / ${s.fileName}`;row.sourceOrgName=s.ownerOrgName||shortId(s.datasetId);
+      if(multi&&row.team)row.team=`${row.team} (${row.sourceOrgName})`;
+      rows.push(row);
+    }
+  }
+  /* 후보 블록: 기관 계약번호, 시작·종료일 */
+  const blocks=new Map();const put=(k,r)=>{if(!blocks.has(k))blocks.set(k,[]);blocks.get(k).push(r);};
+  for(const r of rows){if(r.globalContractKey)put('g:'+s96Norm(r.globalContractKey),r);if(r.startDate&&r.endDate)put('d:'+r.startDate+'|'+r.endDate,r);}
+  const seen=new Map();
+  for(const arr of blocks.values())for(let i=0;i<arr.length;i++)for(let j=i+1;j<arr.length;j++){
+    const a=arr[i],b=arr[j];if(a.sourceDatasetId===b.sourceDatasetId)continue;
+    const key=[`${a.sourceDatasetId}:${a.sourceContractId}`,`${b.sourceDatasetId}:${b.sourceContractId}`].sort().join('||');if(seen.has(key))continue;
+    const why=s96DuplicateReason(a,b);if(!why.reasons.length)continue;
+    const pair=[a,b].sort((x,y)=>`${x.sourceDatasetId}:${x.sourceContractId}`.localeCompare(`${y.sourceDatasetId}:${y.sourceContractId}`));
+    seen.set(key,{key,a:pair[0],b:pair[1],reasons:why.reasons,strong:why.strong,decision:state.collectionSettings.duplicateDecisions[key]||null});
+  }
+  const candidates=[...seen.values()].sort((x,y)=>(y.strong-x.strong)||x.a.contractName.localeCompare(y.a.contractName,'ko'));
+  const OK=['separate','representativeA','representativeB','excludeA','excludeB'];
+  const unresolvedDuplicates=candidates.filter(x=>!x.decision||!OK.includes(x.decision.decision));
+  const excludedList=[],excluded=new Set();
+  for(const x of candidates){const d=x.decision?.decision;let drop=null;if(d==='representativeA'||d==='excludeB')drop=x.b;if(d==='representativeB'||d==='excludeA')drop=x.a;if(drop){const id=`${drop.sourceDatasetId}:${drop.sourceContractId}`;if(!excluded.has(id)){excluded.add(id);excludedList.push({row:drop,reason:`중복 판단(${{representativeA:'A 대표',representativeB:'B 대표',excludeA:'A 제외',excludeB:'B 제외'}[d]}) · ${x.decision.reason||''}`,by:x.decision.updatedBy||'',at:x.decision.updatedAt||''});}}}
+  const afterDup=rows.filter(r=>!excluded.has(`${r.sourceDatasetId}:${r.sourceContractId}`));
+  const scoped=s96ScopeFilter(afterDup,'base');
+  for(const r of afterDup)if(!scoped.rows.includes(r))excludedList.push({row:r,reason:r.recordStatusCode==='cancelled'?'통계 대상 제외(취소)':'통계 대상 제외(일반 초안)',by:'',at:''});
+  return {groups,sourceStatus,selected,issues,rows,resolvedRows:scoped.rows,candidates,unresolvedDuplicates,unresolvedSources:issues.filter(x=>['integrity','version'].includes(x.type)).length,excludedList,scopeCounts:scoped.counts};
+};
+const _s96RenderDuplicates=stage5RenderDuplicates;
+stage5RenderDuplicates=function(a){
+  _s96RenderDuplicates(a);
+  const cards=$$('#collectionDuplicateList .duplicate-card');
+  a.candidates.forEach((x,i)=>{const card=cards[i];if(!card)return;const d=document.createElement('div');d.className='help';d.textContent=`후보 사유: ${x.reasons.join(' / ')}${x.strong?'':' — 같은 업무인지 계약서로 확인하세요'}`;card.insertBefore(d,card.children[1]||null);});
+  if(!a.candidates.length){const e=$('#collectionDuplicateList .empty');if(e)e.lastChild.textContent='서로 다른 데이터셋에서 기관 계약번호가 같거나, 기간이 같고 사업명이 유사한 계약을 후보로만 표시합니다.';}
+};
+const _s96RenderCollection=stage5RenderCollection;
+stage5RenderCollection=function(){
+  _s96RenderCollection();const a=stage5CollectionAnalysis(),w=$('#collectionWarnings'),c=a.scopeCounts||{};
+  if(w&&a.selected.length){const add=[`통계 대상 제외: 취소 ${c.cancelled||0} · 일반 초안 ${c.draft||0}`,`중복 판단 제외 ${a.excludedList.filter(x=>x.reason.startsWith('중복')).length}건`];if(c.draftUnknown)add.push(`이관 여부를 알 수 없는 이전 형식 초안 ${c.draftUnknown}건 포함`);if(a.selected.length>1)add.push('팀은 출처 부서명을 붙여 구분하고, 업체는 공통 업체코드가 없어 명칭 기준 잠정 집계입니다');w.textContent=`${w.textContent} · ${add.join(' · ')}`;}
+};
+stage5ExportCollectionXlsx=async function(finalMode){
+  const a=stage5CollectionAnalysis();if(!a.selected.length){toast('취합할 원본을 먼저 불러오세요.','warn');return;}
+  if(finalMode&&(a.unresolvedSources||a.unresolvedDuplicates.length)){toast('미해결 버전·무결성·중복 후보를 모두 해소해야 확정 취합 XLSX를 만들 수 있습니다.','warn',7000);return;}
+  const collectionId=uuid(),c=a.scopeCounts||{};
+  const settings={viewMode:'history',amountUnit:'won',columns:['contractName','department','team','counterparty','startDate','endDate','totalAmount','amountMode','contractType','competitionMethod','recordStatus','executionStatus','budgetSubjects','sourceDatasetId','sourceSnapshotId','sourceContentHash','sourceContractId']};
+  const warning=finalMode?'중복·버전 해소 완료 후 확정 취합':'검토용 잠정 취합: 미해결 중복/버전이 있을 수 있음';
+  const extra=[['취합 ID',collectionId],['통계 대상','확정 + 이관 검토대기(취소·일반 초안 제외)'],['제외 건수',`중복 판단 ${a.excludedList.filter(x=>x.reason.startsWith('중복')).length} · 취소 ${c.cancelled||0} · 일반 초안 ${c.draft||0}`],['업체 집계','공통 업체코드 미확인 — 명칭 기준 잠정']];
+  const sheets=stage5AuditSheets(a.resolvedRows,settings,{outputType:finalMode?'확정 취합':'검토용 취합',scopeText:`dataset ${a.selected.length}개`,unresolvedDuplicates:a.unresolvedDuplicates.length,unresolvedSources:a.unresolvedSources,warning,extra});
+  const src=[['datasetId','snapshotId','parentSnapshotId','contentHash','저장시각','부서','파일','계약 수','포함 여부','사유']];
+  for(const g of a.sourceStatus)for(const s of g.unique){const inc=g.chosen&&g.chosen.snapshotId===s.snapshotId&&!g.integrityConflict;src.push([s.datasetId,s.snapshotId,s.parentSnapshotId||'',s.contentHash,s.savedAt||'',s.ownerOrgName||'',s.fileName,s.contracts.length,inc?'포함':'제외',inc?'선택 버전':(g.integrityConflict?'무결성 충돌':(g.chosen?'다른 버전 선택됨':'대표 버전 미선택'))]);}
+  sheets.splice(1,0,{name:'취합_출처',rows:src,types:['text','text','text','text','text','text','text','number','text','text'],widths:[38,38,38,66,24,20,36,10,10,20]});
+  const ex=[['계약명','출처 부서','출처 datasetId','출처 계약ID','시작일','종료일','계약금액(원)','제외 사유','판단자','판단 시각']];
+  for(const x of a.excludedList){const r=x.row;ex.push([r.contractName,r.sourceOrgName||'',r.sourceDatasetId,r.sourceContractId,r.startDate,r.endDate,r.totalAmount,x.reason,x.by,x.at]);}
+  if(ex.length===1)ex.push(['제외된 계약 없음']);
+  sheets.splice(2,0,{name:'취합_제외내역',rows:ex,types:['text','text','text','text','date','date','number','text','text','text'],widths:[44,20,38,38,12,12,16,44,14,24]});
+  const un=[['구분','A 계약','A 출처','B 계약','B 출처','후보 사유','판단']];for(const x of a.candidates)un.push([x.strong?'공통키':'유사',x.a.contractName,x.a.sourceOrgName||'',x.b.contractName,x.b.sourceOrgName||'',x.reasons.join(' / '),x.decision?.decision||'미판단']);
+  if(un.length>1)sheets.splice(3,0,{name:'취합_중복후보',rows:un,types:['text','text','text','text','text','text','text'],widths:[10,40,18,40,18,48,14]});
+  await stage5DownloadXlsx(sheets,`계약관리_${finalMode?'확정취합':'검토취합'}_${localDateISO()}.xlsx`);
+};
+
+/* ---------- 6) 빈 배포본·HTML 저장: 최초 정적 DOM 사용 + 잔존 검사(T22) ---------- */
+function s96SensitiveStrings(doc=state){
+  const set=new Set();const add=v=>{const s=String(v||'').trim();if(s.length>=4)set.add(s);};
+  for(const c of doc.contracts||[]){add(c.contractName);add(c.counterpartyNameAtContract);add(c.notes);add(c.managerDisplay);add(c.globalContractKey);}
+  for(const m of doc.masterData||[])if(m.category==='counterparty')add(m.name);
+  add(doc.actorDisplay);return [...set];
+}
+function s96FindLeaks(html,blank){
+  const leaks=[];if((blank.contracts||[]).length)leaks.push(`내장 계약 ${blank.contracts.length}건`);
+  for(const s of s96SensitiveStrings(state))if(html.includes(s)||html.includes(stage5Esc(s)))leaks.push(s);
+  return leaks;
+}
+function s96PristineClone(){const clone=S96_PRISTINE.cloneNode(true);clone.removeAttribute('data-theme');return clone;}
+stage5ExportBlankHtml=async function(){
+  try{
+    const blank=await stage5BlankDocument(),clone=s96PristineClone();
+    clone.querySelector('#embedded-data').textContent=safeJsonForScript(blank);
+    const title=clone.querySelector('title');if(title)title.textContent='계약관리도구 - 5단계';
+    const html='<!doctype html>\n'+clone.outerHTML;const leaks=s96FindLeaks(html,blank);
+    if(leaks.length){toast(`빈 배포본에 실제 계약정보가 남아 있어 생성을 중단했습니다: ${leaks.slice(0,3).join(', ')}${leaks.length>3?` 외 ${leaks.length-3}건`:''}`,'error',9000);return;}
+    downloadBlob(html,'text/html;charset=utf-8',`계약관리도구_5단계_빈배포본_v${APP_VERSION}.html`);
+    toast('실제 계약 데이터가 없는 빈 배포 HTML 다운로드를 요청했습니다. 생성 전 잔존 검사를 통과했습니다.');
+  }catch(e){toast('빈 배포본 생성 실패: '+e.message,'error');}
+};
+saveHtml=async function(){
+  try{
+    await commitSnapshot();
+    const clone=s96PristineClone();
+    clone.querySelector('#embedded-data').textContent=safeJsonForScript(state);const title=clone.querySelector('title');if(title)title.textContent='계약관리도구 - 5단계';
+    downloadBlob('<!doctype html>\n'+clone.outerHTML,'text/html;charset=utf-8',snapshotFilename('html','계약관리도구_5단계'));markClean();renderAll();
+    toast('데이터 포함 HTML 다운로드를 요청했습니다. 실제 저장 위치와 재열기를 확인해 주세요.');
+  }catch(e){toast('HTML 저장 실패: '+e.message,'error');}
+};
+
+/* ---------- 7) T13 협상 기술평가 항목별 30% 한도 ---------- */
+function s96ParseTechItems(text){
+  const items=[],errors=[];
+  String(text||'').split(/\n/).map(x=>x.trim()).filter(Boolean).forEach((line,i)=>{
+    const p=line.split('|').map(x=>x.trim());let kind='미구분',name,score;
+    if(p.length>=3){kind=p[0]||'미구분';name=p[1];score=p[2];}else if(p.length===2){name=p[0];score=p[1];}else{errors.push(`세부항목 ${i+1}행: '구분|항목명|배점' 형식으로 입력하세요.`);return;}
+    const n=Number(String(score).replace(/점$/,''));
+    if(!name)errors.push(`세부항목 ${i+1}행: 항목명이 없습니다.`);
+    else if(!Number.isFinite(n)||n<0||n>100)errors.push(`세부항목 ${i+1}행: 배점은 0~100 숫자로 입력하세요.`);
+    else items.push({kind:['객관','주관'].includes(kind)?kind:'미구분',name:name.slice(0,100),score:n});
+  });
+  return {items,errors};
+}
+function s96TechItemsText(items){return (items||[]).map(x=>`${x.kind}|${x.name}|${x.score}`).join('\n');}
+const _s96NormalizeReview=stage4NormalizeReview;
+stage4NormalizeReview=function(r={}){const o=_s96NormalizeReview(r);o.techItems=Array.isArray(r.techItems)?r.techItems.filter(x=>x&&typeof x==='object'&&Number.isFinite(x.score)).map(x=>({kind:['객관','주관'].includes(x.kind)?x.kind:'미구분',name:String(x.name||'').slice(0,100),score:x.score})):[];return o;};
+const _s96FormReview=stage4FormReview;
+stage4FormReview=function(){const res=_s96FormReview();const el=$('#ruleTechItems');if(el){const p=s96ParseTechItems(el.value);res.review.techItems=p.items;res.errors.push(...p.errors);}return res;};
+const _s96LoadForm=stage4LoadForm;
+stage4LoadForm=function(){const c=stage4SelectedContract(),el=$('#ruleTechItems');if(c&&el)el.value=s96TechItemsText(stage4NormalizeReview(stage4Review(c)).techItems);_s96LoadForm();};
+STAGE4_RULES.push({id:'ng7_items',basis:'ng-app',article:'협상요령 별표 비고(평가항목 30%)',amountType:'배점',compare:'기술평가 각 평가항목 ≤ 기술평가 배점 × 30% (객관·주관 공통)',source:'neg',eval:(c,r)=>{
+  if(r.negotiationType==='no')return {status:'reference',text:'협상요령 비대상 기록입니다.'};
+  if(r.techScore==null)return stage4Missing('항목별 한도 계산에는 기술평가 배점이 필요합니다.');
+  const items=r.techItems||[];if(!items.length)return stage4Missing('기술평가 세부 평가항목과 배점을 입력하세요. 30% 한도는 객관·주관 항목 모두에 적용합니다.');
+  const limit=Math.round(r.techScore*0.3*1e6)/1e6,over=items.filter(x=>x.score>limit+1e-9),sum=Math.round(items.reduce((s,x)=>s+x.score,0)*1e6)/1e6;
+  const msgs=[];if(over.length)msgs.push(`기술평가 ${r.techScore}점의 30% = ${limit}점 한도 초과: ${over.map(x=>`${x.kind} ‘${x.name}’ ${x.score}점`).join(', ')}`);
+  if(sum!==r.techScore)msgs.push(`세부항목 합계 ${sum}점이 기술평가 배점 ${r.techScore}점과 다릅니다.`);
+  if(msgs.length)return {status:'check',text:msgs.join(' / ')};
+  const ko=items.filter(x=>x.kind==='객관').length,ju=items.filter(x=>x.kind==='주관').length;
+  return {status:'reference',text:`모든 세부항목이 한도 ${limit}점 이내이며 합계가 기술평가 배점과 일치합니다(객관 ${ko}개 · 주관 ${ju}개 · 미구분 ${items.length-ko-ju}개).`};
+}});
+const _s96Checklist=stage4Checklist;
+stage4Checklist=function(c,review,evals){const list=_s96Checklist(c,review,evals);const x=list.find(i=>i.key==='negCommittee'),e=evals.find(v=>v.id==='ng7_items');if(x&&e)x.auto=`${x.auto} ${e.text}`.trim();return list;};
+const _s96Stage4Validate=stage4ValidateExtensions;
+stage4ValidateExtensions=function(doc){const r=_s96Stage4Validate(doc);for(const c of doc.contracts||[]){const t=c.regulationReview?.techItems;if(t==null)continue;if(!Array.isArray(t)){r.errors.push(`계약 ${shortId(c.id)}의 techItems 형식 오류`);continue;}for(const x of t)if(!x||!Number.isFinite(x.score)||x.score<0||x.score>100)r.errors.push(`계약 ${shortId(c.id)}의 기술평가 세부항목 배점 오류`);}return r;};
+
+/* ---------- 8) 기관 계약번호(공통키) 입력 ---------- */
+FIELD_LABELS.globalContractKey='기관 계약번호(공통키)';FIELD_DEFAULTS.globalContractKey='';
+const _s96ContractFormData=contractFormData;
+contractFormData=function(){const d=_s96ContractFormData();if(d&&!d.parseError)d.globalContractKey=($('#fGlobalContractKey')?.value||'').trim().slice(0,100);return d;};
+const _s96OpenContractForm=openContractForm;
+openContractForm=function(id=null){_s96OpenContractForm(id);const el=$('#fGlobalContractKey');if(el){const c=id?state.contracts.find(x=>x.id===id):null;el.value=c?.globalContractKey||'';}};
+
+/* ---------- 9) 리포트 설정 검증 ---------- */
+const _s96Stage5Validate=stage5ValidateExtensions;
+stage5ValidateExtensions=function(doc){const r=_s96Stage5Validate(doc);const s=doc.reportSettings?.scope;if(s!=null&&!S96_SCOPE_LABELS[s])r.errors.push(`reportSettings.scope 값이 올바르지 않습니다: ${s}`);return r;};
+
+/* ---------- 10) 내장 라이브러리 목록·무결성 ---------- */
+async function s96LibraryHash(kind){
+  if(kind==='font'){for(const st of document.querySelectorAll('style')){const m=st.textContent.match(/src:url\(data:font\/woff2;base64,([A-Za-z0-9+/=]+)\)/);if(m)return sha256Hex(m[1]);}return null;}
+  for(const s of document.scripts){const t=s.textContent||'';
+    if(kind==='chart'&&t.slice(0,300).includes('Chart.js v4.5.1'))return sha256Hex(t);
+    if(kind==='jszip'&&t.slice(0,300).includes('JSZip v3.10.1')){const i=t.indexOf("\n(() => {\n'use strict';");return sha256Hex(i>0?t.slice(0,i):t);}}
+  return null;
+}
+async function s96RenderLibraries(){
+  const tb=$('#s96LibTbody');if(!tb)return;tb.innerHTML='';
+  for(const lib of S96_LIBS){const tr=document.createElement('tr');const h=await s96LibraryHash(lib.kind).catch(()=>null);const ok=h===lib.sha256;
+    for(const v of [lib.name,lib.version,lib.license,lib.source,lib.sha256.slice(0,16)+'…'])tr.appendChild(Object.assign(document.createElement('td'),{textContent:v}));
+    const td=document.createElement('td');const tag=document.createElement('span');tag.className='tag '+(ok?'green':'red');tag.textContent=h==null?'확인 불가':(ok?'일치':'불일치');tag.title=h?`계산값 ${h}`:'';td.appendChild(tag);tr.appendChild(td);tb.appendChild(tr);}
+  const v=$('#s96AppVersion');if(v)v.textContent=`프로그램 ${APP_VERSION} · 데이터 형식 ${SCHEMA_VERSION} · 외부 네트워크 호출 없음`;
+}
+
+/* ---------- 11) 화면 요소 추가(정적 DOM 복제본에는 포함하지 않음) ---------- */
+function s96InjectUi(){
+  const reason=$('#ruleScoreReason')?.closest('.form-field');
+  if(reason&&!$('#ruleTechItems')){const f=document.createElement('div');f.className='form-field full';f.innerHTML='<label for="ruleTechItems">기술평가 세부항목 배점</label><textarea id="ruleTechItems" rows="4" placeholder="한 줄에 한 항목: 구분|항목명|배점&#10;예) 객관|수행실적|10&#10;    주관|사업 이해도|20"></textarea><div class="help">구분은 객관·주관 중 하나입니다. 별표 비고에 따라 각 항목은 기술평가 배점의 30%를 넘을 수 없으며 객관·주관 모두 적용합니다.</div>';reason.after(f);}
+  const rs=$('#statsRecordStatus')?.closest('.form-field');
+  if(rs&&!$('#statsScope')){const f=document.createElement('div');f.className='form-field';f.innerHTML='<label for="statsScope">통계 대상</label><select id="statsScope" title="기본은 취소·일반 초안을 제외하고 이관 검토대기는 포함합니다"></select><div class="help" id="statsScopeNote"></div>';const sel=f.querySelector('select');const short={base:'기본 (확정 + 이관 검토대기)',confirmed:'확정만',all:'전체 (초안·취소 포함)'};for(const k of Object.keys(S96_SCOPE_LABELS)){const o=document.createElement('option');o.value=k;o.textContent=short[k];o.title=S96_SCOPE_LABELS[k];sel.appendChild(o);}rs.before(f);}
+  const nm=$('#fContractName')?.closest('.form-field');
+  if(nm&&!$('#fGlobalContractKey')){const f=document.createElement('div');f.className='form-field full';f.innerHTML='<label for="fGlobalContractKey">기관 계약번호(공통키, 선택)</label><input id="fGlobalContractKey" type="text" maxlength="100" placeholder="예: 전자계약 시스템의 계약번호"><div class="help">부서별 파일을 취합할 때 같은 계약을 찾는 데 사용합니다. 모르면 비워 두세요.</div>';nm.after(f);}
+  const dv=$('#view-data');
+  if(dv&&!$('#s96LibCard')){const card=document.createElement('div');card.className='card card-pad mt12';card.id='s96LibCard';card.innerHTML='<h3 class="card-title">내장 라이브러리 · 무결성</h3><p class="help" id="s96AppVersion"></p><div class="table-wrap"><table class="data-table"><thead><tr><th>이름</th><th>버전</th><th>라이선스</th><th>출처</th><th>SHA-256(기준)</th><th>현재 파일</th></tr></thead><tbody id="s96LibTbody"></tbody></table></div><div class="help">기준 해시는 1.5.0 배포 시점 값입니다. ‘불일치’는 내장 라이브러리가 바뀌었다는 뜻이므로 배포 전에 출처를 확인하세요.</div>';dv.appendChild(card);}
+}
+s96InjectUi();
+
+/* ---------- 12) 이벤트·부팅 연결 ---------- */
+const _s96BindEvents=bindEvents;
+bindEvents=function(){_s96BindEvents();$('#statsScope')?.addEventListener('change',stage5RenderStatistics);$('#ruleTechItems')?.addEventListener('input',()=>{if(currentView==='rules')renderStage4Results();});};
+const _s96SwitchView=switchView;
+switchView=function(v){_s96SwitchView(v);if(v==='data')s96RenderLibraries();};
+const _s96Boot=boot;
+boot=async function(){await _s96Boot();stage5EnsureState(state);state.appVersion=APP_VERSION;state.contentHash=await computeContentHash(state);
+  if(window.__CM_TEST__)Object.assign(window.__CM_TEST__,{s96FindLeaks:(html,blank)=>s96FindLeaks(html,blank||{contracts:[]}),s96ParseTechItems:t=>deepClone(s96ParseTechItems(t)),s96Dice:(a,b)=>s96Dice(a,b),s96LibraryHashes:async()=>{const o={};for(const l of S96_LIBS)o[l.kind]={expected:l.sha256,actual:await s96LibraryHash(l.kind)};return o;},s96ExportAuditSheets:()=>{const s=stage5CurrentUiSettings(),sel=stage5SelectRows(s);return deepClone({sel:{scope:sel.scope,scopeCounts:sel.scopeCounts,rows:sel.rows.length}});}});
+};
+
+
+/* ==========================================================
+   모듈 97: 1.5.1 — 회사 PC 환경 점검(0·6단계) · 빈 배포본 배포 부서 지정
+   ========================================================== */
+const S97_MANUAL_CHECKS=[
+  ['saveLocation','HTML 저장 후 다운로드 파일이 원하는 폴더에 실제로 저장됨'],
+  ['reopenOther','저장한 HTML을 다른 폴더로 옮겨 다시 열었을 때 같은 건수·합계가 보임'],
+  ['jsonRestore','JSON 백업 파일을 불러와 복원이 끝까지 됨'],
+  ['xlsxOpen','감사자료 XLSX가 회사 엑셀에서 경고 없이 열리고 날짜·금액 서식이 맞음'],
+  ['xlsxImport','원본 현황 엑셀(xlsx)을 이관 화면에서 분석할 수 있음'],
+  ['offline','사내망(인터넷 차단) 상태에서 위 작업이 모두 됨'],
+  ['policy','보안 솔루션(DRM·다운로드 차단 등)이 저장·열기를 막지 않음']
+];
+let s97LastReport=null;
+async function s97Check(name,fn){const t0=performance.now();try{const r=await fn();return {name,ok:r.ok!==false,detail:r.detail||'',ms:Math.round(performance.now()-t0)};}catch(e){return {name,ok:false,detail:'오류: '+(e&&e.message||e),ms:Math.round(performance.now()-t0)};}}
+async function s97RunChecks(){
+  const out=[];const push=async(n,f)=>out.push(await s97Check(n,f));
+  await push('실행 방식',async()=>({ok:location.protocol==='file:',detail:`${location.protocol} ${location.protocol==='file:'?'(로컬 파일 실행)':'(로컬 파일이 아님 — 배포 방식 확인)'}`}));
+  await push('브라우저',async()=>({ok:true,detail:navigator.userAgent}));
+  await push('운영체제·화면',async()=>({ok:true,detail:`${navigator.platform||'-'} · 화면 ${screen.width}×${screen.height} · 배율 ${devicePixelRatio} · CPU ${navigator.hardwareConcurrency||'?'}코어 · 메모리 ${navigator.deviceMemory?navigator.deviceMemory+'GB 이상':'미제공'}`}));
+  await push('localStorage(임시 복구)',async()=>{const k='cm-envcheck:'+Date.now();localStorage.setItem(k,'1');const v=localStorage.getItem(k);localStorage.removeItem(k);return {ok:v==='1',detail:v==='1'?'쓰기·읽기·삭제 가능 — 임시 복구 사용 가능':'읽기 실패'};});
+  await push('sessionStorage',async()=>{sessionStorage.setItem('cm-envcheck','1');const v=sessionStorage.getItem('cm-envcheck');sessionStorage.removeItem('cm-envcheck');return {ok:v==='1',detail:'사용 가능'};});
+  await push('SHA-256(무결성 계산)',async()=>{const h=await sha256Hex('abc');const native=!!(globalThis.crypto&&crypto.subtle);return {ok:h==='ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',detail:native?'브라우저 내장 crypto.subtle 사용':'내장 대체 계산 사용(정상 동작, 속도만 느림)'};});
+  await push('날짜·숫자 표시',async()=>{const p=calculatePeriod('2024-02-29','2025-02-28');return {ok:p.text==='12개월 1일'&&(1234567).toLocaleString('ko-KR')==='1,234,567',detail:`윤년 기간 ${p.text}, 금액 ${(1234567).toLocaleString('ko-KR')}`};});
+  await push('파일 다운로드 기능',async()=>{const a=document.createElement('a');const ok='download' in a&&typeof URL.createObjectURL==='function';const u=URL.createObjectURL(new Blob(['x']));URL.revokeObjectURL(u);return {ok,detail:'다운로드 링크 생성 가능 — 실제 저장 여부는 아래 수동 확인 항목으로 확인'};});
+  await push('파일 읽기 기능',async()=>{const f=new File(['{"a":1}'],'t.json',{type:'application/json'});const t=await f.text();return {ok:JSON.parse(t).a===1,detail:'File API 사용 가능'};});
+  await push('내장 글꼴',async()=>{await document.fonts.ready;const ok=document.fonts.check('16px "Pretendard CM"','계약관리');return {ok,detail:ok?'Pretendard 로드됨':'로드 안 됨 — 시스템 글꼴로 표시'};});
+  await push('차트(Chart.js)',async()=>{if(typeof window.Chart!=='function')return {ok:false,detail:'Chart.js 없음 — 기본 막대 표시로 대체'};const c=document.createElement('canvas');c.width=200;c.height=100;const ch=new Chart(c,{type:'bar',data:{labels:['a'],datasets:[{data:[1]}]},options:{animation:false,responsive:false}});ch.destroy();return {ok:true,detail:'차트 생성 가능'};});
+  await push('XLSX 생성·읽기',async()=>{const bytes=await stage5BuildXlsx([{name:'점검',rows:[['항목','값'],['날짜','2026-01-01'],['금액',1234]],types:['text','text']}],'uint8array');const z=await JSZip.loadAsync(bytes);return {ok:!!z.file('xl/workbook.xml'),detail:`XLSX ${bytes.length}바이트 생성·압축 해제 성공`};});
+  await push('내장 라이브러리 무결성',async()=>{const bad=[];for(const l of S96_LIBS){const h=await s96LibraryHash(l.kind);if(h!==l.sha256)bad.push(l.name);}return {ok:!bad.length,detail:bad.length?'불일치: '+bad.join(', '):'3종 모두 기준 해시와 일치'};});
+  await push('현재 데이터 검증',async()=>{const v=await validateDocument(deepClone(state),{verifyHash:false});return {ok:v.ok,detail:v.ok?`계약 ${state.contracts.length}건 · 기준정보 ${state.masterData.length}건 · 형식 ${state.schemaVersion} 정상`:v.errors.slice(0,2).join(' / ')};});
+  await push('처리 속도(1,000건 정렬·집계)',async()=>{const base=state.contracts[0]||{};const rows=[];for(let i=0;i<1000;i++)rows.push({...base,id:'perf'+i,contractName:'점검'+(i%37),totalAmount:i*1000});const t0=performance.now();rows.sort((a,b)=>a.contractName.localeCompare(b.contractName,'ko'));const s=rows.reduce((a,c)=>a+c.totalAmount,0);const ms=performance.now()-t0;return {ok:ms<2000,detail:`${ms.toFixed(0)}ms (합계 확인 ${s.toLocaleString('ko-KR')})`};});
+  await push('지원 한도',async()=>({ok:true,detail:`JSON·XLSX 각 ${bytesToMiB(MAX_JSON_BYTES)} · 이관 데이터 기준 약 4,500건(원본 셀 추적 포함) · 직접 등록 위주면 더 많음`}));
+  return out;
+}
+function s97ManualState(){const o={};for(const [k] of S97_MANUAL_CHECKS){const el=$('#s97m_'+k);o[k]=el?el.value:'unknown';}return o;}
+function s97ReportText(results){
+  const m=s97ManualState(),L={unknown:'미확인',ok:'확인됨',fail:'안 됨'};
+  const lines=[`계약관리도구 환경 점검 결과`,`점검 시각: ${new Date().toLocaleString('ko-KR')}`,`프로그램: ${APP_VERSION} / 데이터 형식 ${SCHEMA_VERSION}`,`파일 위치: ${decodeURIComponent(location.pathname)}`,`점검자: ${state.actorDisplay||'(작성자 표시 없음)'}`,'','[자동 점검]'];
+  for(const r of results)lines.push(`${r.ok?'통과':'확인 필요'} | ${r.name} | ${r.detail} | ${r.ms}ms`);
+  lines.push('','[수동 확인 — 점검자가 직접 수행]');for(const [k,t] of S97_MANUAL_CHECKS)lines.push(`${L[m[k]]||'미확인'} | ${t}`);
+  const autoFail=results.filter(r=>!r.ok).length,manualFail=Object.values(m).filter(v=>v==='fail').length,manualUnknown=Object.values(m).filter(v=>v==='unknown').length;
+  lines.push('',`판정: ${autoFail||manualFail?'운영 불가 항목 있음 — 차단 요인 해소 필요':manualUnknown?'수동 확인 미완료 — 합격 판정 보류':'이 PC에서 핵심 실행방식 확인 완료'}`);
+  lines.push('주의: 이 결과는 이 PC·이 브라우저에 대한 것이며 다른 PC의 합격을 뜻하지 않습니다.');
+  return lines.join('\n');
+}
+async function s97RunAndRender(){
+  const btn=$('#s97RunBtn');if(btn)btn.disabled=true;
+  try{const res=await s97RunChecks();s97LastReport=res;const tb=$('#s97Tbody');tb.innerHTML='';
+    for(const r of res){const tr=document.createElement('tr');const td0=document.createElement('td');const tag=document.createElement('span');tag.className='tag '+(r.ok?'green':'orange');tag.textContent=r.ok?'통과':'확인 필요';td0.appendChild(tag);tr.appendChild(td0);for(const v of [r.name,r.detail,r.ms+'ms']){const td=document.createElement('td');td.textContent=v;tr.appendChild(td);}tb.appendChild(tr);}
+    const f=res.filter(r=>!r.ok).length;$('#s97Summary').textContent=f?`자동 점검 ${res.length}개 중 ${f}개 확인 필요`:`자동 점검 ${res.length}개 모두 통과 · 아래 수동 확인 항목을 직접 수행하세요`;
+    $('#s97SaveBtn').disabled=false;
+  }finally{if(btn)btn.disabled=false;}
+}
+function s97SaveReport(){if(!s97LastReport){toast('먼저 환경 점검을 실행하세요.','warn');return;}downloadBlob(s97ReportText(s97LastReport),'text/plain;charset=utf-8',`계약관리도구_환경점검_${localDateISO()}.txt`);toast('환경 점검 결과 다운로드를 요청했습니다.');}
+function s97InjectUi(){
+  const dv=$('#view-data');if(!dv||$('#s97Card'))return;
+  const card=document.createElement('div');card.className='card card-pad mt12';card.id='s97Card';
+  const opts='<option value="unknown">미확인</option><option value="ok">확인됨</option><option value="fail">안 됨</option>';
+  card.innerHTML=`<h3 class="card-title">환경 점검 (회사 PC)</h3><p class="help">이 PC에서 프로그램이 저장·복원·출력을 할 수 있는지 확인합니다. 자동 점검 후 수동 항목을 직접 해 보고 결과 파일을 저장해 보관하세요.</p><div class="stack mb12"><button class="btn primary" id="s97RunBtn" type="button">환경 점검 실행</button><button class="btn secondary" id="s97SaveBtn" type="button" disabled>결과 저장(TXT)</button><span class="muted" id="s97Summary"></span></div><div class="table-wrap mb12"><table class="data-table"><thead><tr><th>결과</th><th>항목</th><th>내용</th><th>시간</th></tr></thead><tbody id="s97Tbody"></tbody></table></div><div class="grid cols-2">${S97_MANUAL_CHECKS.map(([k,t])=>`<div class="form-field"><label for="s97m_${k}">${t}</label><select id="s97m_${k}">${opts}</select></div>`).join('')}</div>`;
+  const lib=$('#s96LibCard');if(lib)lib.before(card);else dv.appendChild(card);
+}
+s97InjectUi();
+
+/* ---------- 빈 배포본: 배포 부서 지정 ---------- */
+async function s97BlankDocumentFor(targetName){
+  const doc=await stage5BlankDocument();const curOwner=masterById(state.ownerOrgId);
+  const name=String(targetName||'').trim();
+  if(!name||name===curOwner?.name)return {doc,changed:false};
+  doc.masterData=doc.masterData.filter(m=>m.category!=='department'&&m.category!=='team');
+  const owner={id:uuid(),category:'department',name,aliases:[],parentId:null,sortOrder:1,hidden:false,createdAt:nowIso(),updatedAt:nowIso()};
+  doc.masterData.push(owner);doc.ownerOrgId=owner.id;
+  auditOnDoc(doc,'create','dataset',doc.datasetId,'빈 배포본 생성(배포 부서 지정)',{owner:name});
+  doc.contentHash=await computeContentHash(doc);return {doc,changed:true};
+}
+stage5ExportBlankHtml=async function(){
+  try{
+    const cur=masterById(state.ownerOrgId)?.name||'';
+    const target=prompt(`배포받을 부서명을 입력하세요.\n· 현재 부서(${cur})와 같거나 비우면 현재 부서·팀 기준정보를 그대로 둡니다.\n· 다른 부서명을 입력하면 현재 부서·팀 기준정보를 빼고 입력한 부서를 소유 부서로 지정합니다.\n예산편성부서·계약대상·계약방법 등 공통 기준정보와 규정 도움말은 유지됩니다.`,cur);
+    if(target===null)return;
+    const {doc:blank,changed}=await s97BlankDocumentFor(target);
+    const v=await validateDocument(deepClone(blank),{verifyHash:true});if(!v.ok){toast('빈 배포본 검증 실패: '+v.errors.slice(0,2).join(' / '),'error',8000);return;}
+    const clone=s96PristineClone();clone.querySelector('#embedded-data').textContent=safeJsonForScript(blank);
+    const title=clone.querySelector('title');if(title)title.textContent='계약관리도구 - 5단계';
+    const html='<!doctype html>\n'+clone.outerHTML;const leaks=s96FindLeaks(html,blank);
+    if(leaks.length){toast(`빈 배포본에 실제 계약정보가 남아 있어 생성을 중단했습니다: ${leaks.slice(0,3).join(', ')}${leaks.length>3?` 외 ${leaks.length-3}건`:''}`,'error',9000);return;}
+    downloadBlob(html,'text/html;charset=utf-8',`계약관리도구_빈배포본_${sanitizeFilenamePart(changed?String(target).trim():cur)}_v${APP_VERSION}.html`);
+    toast(changed?`‘${String(target).trim()}’ 부서용 빈 배포 HTML을 만들었습니다(이전 부서·팀 기준정보 제외, 잔존 검사 통과).`:'현재 부서 기준정보를 유지한 빈 배포 HTML을 만들었습니다(잔존 검사 통과).');
+  }catch(e){toast('빈 배포본 생성 실패: '+e.message,'error');}
+};
+
+const _s97BindEvents=bindEvents;
+bindEvents=function(){_s97BindEvents();$('#s97RunBtn')?.addEventListener('click',s97RunAndRender);$('#s97SaveBtn')?.addEventListener('click',s97SaveReport);};
+const _s97Boot=boot;
+boot=async function(){await _s97Boot();if(window.__CM_TEST__)Object.assign(window.__CM_TEST__,{s97RunChecks:async()=>deepClone(await s97RunChecks()),s97BlankDocumentFor:async n=>deepClone(await s97BlankDocumentFor(n)),s97ReportText:r=>s97ReportText(r)});};
 
 /* ==========================================================
    UI 개선 레이어 (v1.4.1 UI)
@@ -2571,14 +3001,14 @@ const _uxOrigRenderCharts=stage5RenderCharts;
 stage5RenderCharts=function(target,rows,unit){
   if(!uxChartReady()||!target)return _uxOrigRenderCharts(target,rows,unit);
   target.innerHTML='';const interactive=target.id==='statsCharts';const ulabel=(STAGE5_AMOUNT_UNITS[unit]||STAGE5_AMOUNT_UNITS.won).label;
-  const defs=[['연도별','year'],['팀별','team'],['업체별','counterparty'],['계약대상별','contractType'],['계약방법별','method'],['이행상태별','executionStatus']];
+  const defs=[['시작연도별','year'],['팀별','team'],['업체별','counterparty'],['계약대상별','contractType'],['계약방법별','method'],['이행상태별','executionStatus'],['예산편성부서별 관련금액','_budget']];
   for(const [title,field] of defs){
-    let agg=stage5Aggregate(rows,field);const total=agg.length;
-    if(field==='year')agg=agg.sort((a,b)=>String(a.key).localeCompare(String(b.key)));else agg=agg.slice(0,field==='counterparty'?10:8);
+    let agg=field==='_budget'?stage5Aggregate(s96BudgetRows(rows),'_budget'):stage5Aggregate(rows,field);const total=agg.length;
+    if(field==='year')agg=agg.sort((a,b)=>String(a.key).localeCompare(String(b.key)));else agg=agg.slice(0,(field==='counterparty'||field==='_budget')?10:8);
     const card=document.createElement('div');card.className='chart-card';
     card.innerHTML=`<h4></h4><div class="chart-note"></div><div class="chart-toggle"><button type="button" data-m="amount">금액</button><button type="button" data-m="count">건수</button></div><div class="chart-canvas-wrap"><canvas></canvas></div>`;
     card.querySelector('h4').textContent=title;if(total>agg.length){const chip=document.createElement('span');chip.className='chip';chip.textContent=`상위 ${agg.length} / ${total}`;card.querySelector('h4').appendChild(chip);}
-    card.querySelector('.chart-note').textContent=(interactive?'막대를 클릭하면 해당 조건으로 조회합니다 · ':'')+'금액은 확정 총액만 합산';
+    card.querySelector('.chart-note').textContent=field==='_budget'?'한 계약이 여러 부서에 연결되면 각 부서에 전액 표시(중복 포함) · 부서 금액을 더하면 총액을 초과하므로 합산하지 마세요':(interactive?'막대를 클릭하면 해당 조건으로 조회합니다 · ':'')+(field==='year'?'계약 시작일 기준 · ':'')+'금액은 확정 총액만 합산';
     target.appendChild(card);
     if(!agg.length){card.querySelector('.chart-canvas-wrap').innerHTML='<div class="muted" style="padding:30px 0;text-align:center">표시할 데이터가 없습니다.</div>';card.querySelector('.chart-toggle').remove();continue;}
     const vertical=field==='year';const wrap=card.querySelector('.chart-canvas-wrap');wrap.style.height=(vertical?240:Math.max(150,agg.length*30+30))+'px';
@@ -2588,8 +3018,8 @@ stage5RenderCharts=function(target,rows,unit){
     const ch=uxMakeChart(card.querySelector('canvas'),{type:'bar',data:{labels:agg.map(x=>x.key),datasets:[{label:mode==='amount'?`확정금액(${ulabel})`:'계약건수',data:dataFor(mode),backgroundColor:color,borderRadius:6,borderSkipped:false,maxBarThickness:vertical?38:20}]},
       options:{indexAxis:vertical?'x':'y',plugins:{legend:{display:false},tooltip:{callbacks:{title:items=>items[0].label,label:ctx=>{const x=agg[ctx.dataIndex];return [`확정금액 ${stage5FormatScaled(x.amountSum,unit)} (${x.amountCount}건)`,`계약건수 ${x.count}건`,x.unitCount?`단가계약 ${x.unitCount}건`:'',x.unknownAmountCount?`금액 미확인 ${x.unknownAmountCount}건`:''].filter(Boolean);}}}},
         scales:{x:{grid:{display:!vertical,color:uxCss('--line-soft')},ticks:{color:uxCss('--muted'),maxRotation:0,autoSkipPadding:12,callback:function(v){const l=this.getLabelForValue(v);return vertical?l:(mode==='amount'&&unit==='won'?uxCompact(v):Number(v).toLocaleString('ko-KR'));}}},y:{grid:{display:vertical,color:uxCss('--line-soft')},ticks:{color:uxCss('--muted'),callback:function(v){return vertical?(mode==='amount'&&unit==='won'?uxCompact(v):Number(v).toLocaleString('ko-KR')):uxShortLabel(this.getLabelForValue(v));}}}},
-        onHover:(e,els)=>{e.native.target.style.cursor=interactive&&els.length?'pointer':'default';},
-        onClick:(e,els)=>{if(!interactive||!els.length)return;uxApplyStatsFilter(field,agg[els[0].index].key);}}});
+        onHover:(e,els)=>{e.native.target.style.cursor=interactive&&field!=='_budget'&&els.length?'pointer':'default';},
+        onClick:(e,els)=>{if(!interactive||field==='_budget'||!els.length)return;uxApplyStatsFilter(field,agg[els[0].index].key);}}});
     const tg=card.querySelector('.chart-toggle');const setMode=m=>{mode=m;tg.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));if(ch){ch.data.datasets[0].data=dataFor(m);ch.data.datasets[0].label=m==='amount'?`확정금액(${ulabel})`:'계약건수';ch.update();}};
     tg.querySelectorAll('button').forEach(b=>b.onclick=()=>setMode(b.dataset.m));setMode(mode);
   }
