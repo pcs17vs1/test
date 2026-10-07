@@ -541,7 +541,7 @@ mark.hl{background:color-mix(in srgb,#ffd84d 55%,transparent);color:inherit;bord
 <header class="app-header">
   <div class="brand">
     <div class="brand-mark">契</div>
-    <div style="min-width:0"><h1>계약관리도구<span class="ver">v1.5.1</span></h1><small>통계 · 시각화 · 감사자료 · 읽기전용 취합</small></div>
+    <div style="min-width:0"><h1>계약관리도구<span class="ver">v1.5.2</span></h1><small>통계 · 시각화 · 감사자료 · 읽기전용 취합</small></div>
   </div>
   <button type="button" class="header-search" id="paletteBtn" title="검색·명령 (Ctrl+K)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="hs-text">계약 검색 · 메뉴 이동 · 작업 실행</span><span class="kbd">Ctrl K</span></button>
   <div class="header-meta">
@@ -985,7 +985,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 (() => {
 'use strict';
 /* 계약관리도구 2단계 — 모듈 00: 상수·공통 유틸 (build.py가 IIFE로 결합) */
-const APP_VERSION = '1.5.1-stage5';
+const APP_VERSION = '1.5.2-stage5';
 const SCHEMA_VERSION = '1.0.0';
 const MAX_JSON_BYTES = 25 * 1024 * 1024;
 const MAX_XLSX_BYTES = 25 * 1024 * 1024;
@@ -2919,6 +2919,140 @@ const _s97BindEvents=bindEvents;
 bindEvents=function(){_s97BindEvents();$('#s97RunBtn')?.addEventListener('click',s97RunAndRender);$('#s97SaveBtn')?.addEventListener('click',s97SaveReport);};
 const _s97Boot=boot;
 boot=async function(){await _s97Boot();if(window.__CM_TEST__)Object.assign(window.__CM_TEST__,{s97RunChecks:async()=>deepClone(await s97RunChecks()),s97BlankDocumentFor:async n=>deepClone(await s97BlankDocumentFor(n)),s97ReportText:r=>s97ReportText(r)});};
+
+
+/* ==========================================================
+   모듈 98: 1.5.2 — 문서보안(DRM) 파일 감지 안내 · 엑셀 붙여넣기 이관
+   - 브라우저가 DRM 암호화 내용을 그대로 받으면 XLSX(zip)·JSON 형식이 아니다.
+     파일 앞부분으로 판별해 원인을 알리고 처리를 멈춘다(데이터 변경 없음).
+   - DRM으로 파일 업로드가 막힌 환경을 위해, 엑셀에서 복사한 ‘기초데이터’
+     표(A1:T)를 붙여넣어 기존 XLSX 이관과 같은 분석·검토·배치 절차로 처리한다.
+   ========================================================== */
+const S98_DRM_MESSAGE='문서보안(DRM)이 적용된 파일로 보입니다. 문서보안(DRM) 해제 후 업로드 하시기 바랍니다.';
+const S98_PASTE_BUFFERS=new WeakMap();
+const S98_PASTE_MAX_CHARS=5*1024*1024;
+
+async function s98Head(file,n=16){try{return new Uint8Array(await file.slice(0,n).arrayBuffer());}catch{return new Uint8Array(0);}}
+async function s98LooksLikeZip(file){const h=await s98Head(file,4);return h.length>=4&&h[0]===0x50&&h[1]===0x4b&&(h[2]===0x03||h[2]===0x05||h[2]===0x07)&&(h[3]===0x04||h[3]===0x06||h[3]===0x08);}
+async function s98LooksLikeJson(file){
+  const h=await s98Head(file,64);if(!h.length)return true;
+  let i=0;if(h[0]===0xef&&h[1]===0xbb&&h[2]===0xbf)i=3;
+  while(i<h.length&&(h[i]===0x20||h[i]===0x09||h[i]===0x0a||h[i]===0x0d))i++;
+  return i>=h.length||h[i]===0x7b||h[i]===0x5b;
+}
+function s98IsRealFile(f){return f&&typeof f.slice==='function'&&!S98_PASTE_BUFFERS.has(f.__s98buf);}
+
+/* ---------- 1) DRM 감지 ---------- */
+const _s98AnalyzeXlsxFile=analyzeXlsxFile;
+analyzeXlsxFile=async function(file){
+  if(file&&file.__s98paste)return _s98AnalyzeXlsxFile(file);
+  if(s98IsRealFile(file)&&/\.xlsx$/i.test(file.name||'')&&file.size>0&&!(await s98LooksLikeZip(file)))throw new Error(S98_DRM_MESSAGE);
+  return _s98AnalyzeXlsxFile(file);
+};
+const _s98HandleRestoreFile=handleRestoreFile;
+handleRestoreFile=async function(file){
+  if(s98IsRealFile(file)&&file.size>0&&file.size<=MAX_JSON_BYTES&&!(await s98LooksLikeJson(file))){toast(S98_DRM_MESSAGE,'error',9000);return;}
+  return _s98HandleRestoreFile(file);
+};
+const _s98HandleCollectionFiles=stage5HandleCollectionFiles;
+stage5HandleCollectionFiles=async function(files){
+  const ok=[],blocked=[];
+  for(const f of [...(files||[])]){if(s98IsRealFile(f)&&f.size>0&&!(await s98LooksLikeJson(f)))blocked.push(f.name);else ok.push(f);}
+  if(blocked.length)toast(`${S98_DRM_MESSAGE} (${blocked.slice(0,3).join(', ')}${blocked.length>3?` 외 ${blocked.length-3}개`:''})`,'error',9000);
+  if(ok.length)return _s98HandleCollectionFiles(ok);
+};
+
+/* ---------- 2) 붙여넣기(엑셀 복사 TSV) 해석 ---------- */
+function s98ParseTsv(text){
+  const rows=[];let row=[],cell='',q=false,i=0;const s=String(text||'').replace(/\r\n?/g,'\n');
+  const pushCell=()=>{row.push(cell);cell='';};const pushRow=()=>{pushCell();rows.push(row);row=[];};
+  while(i<s.length){const ch=s[i];
+    if(q){if(ch==='"'){if(s[i+1]==='"'){cell+='"';i+=2;continue;}q=false;i++;continue;}cell+=ch;i++;continue;}
+    if(ch==='"'&&cell===''){q=true;i++;continue;}
+    if(ch==='\t'){pushCell();i++;continue;}
+    if(ch==='\n'){pushRow();i++;continue;}
+    cell+=ch;i++;}
+  if(cell!==''||row.length)pushRow();
+  while(rows.length&&rows[rows.length-1].every(c=>c.trim()===''))rows.pop();
+  return rows;
+}
+function s98ToIsoDate(v){
+  const t=String(v||'').trim();if(!t)return '';
+  let m=t.match(/^(\d{4})\s*[-./년]\s*(\d{1,2})\s*[-./월]\s*(\d{1,2})\s*일?\.?(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?$/);
+  if(m){const iso=`${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;return parseDateOnly(iso)?iso:t;}
+  return t;
+}
+function s98ToNumber(v){
+  const t=String(v||'').trim();if(!t)return null;
+  const c=t.replace(/,/g,'').replace(/원$/,'');
+  if(/^-?\d+(\.\d+)?$/.test(c)){const n=Number(c);return Number.isFinite(n)?n:t;}
+  return t;
+}
+const S98_NUMERIC_COLS=new Set(['F','G','H','N','P','Q','R']);
+function s98BuildSheet(rows){
+  const map=new Map();
+  rows.forEach((r,ri)=>{const rn=ri+1;const obj={};
+    COLS.forEach((col,ci)=>{let raw=r[ci]!=null?r[ci]:'';
+      if(rn===1){if(raw!=='')obj[col]={address:`${col}${rn}`,value:raw,type:'s',formula:null,cache:null};return;}
+      if(String(raw).trim()==='')return;
+      let value=raw,type='s';
+      if(col==='C'||col==='D')value=s98ToIsoDate(raw);
+      else if(S98_NUMERIC_COLS.has(col)){const n=s98ToNumber(raw);if(typeof n==='number'){value=n;type='n';}}
+      obj[col]={address:`${col}${rn}`,value,type,formula:null,cache:null,pasted:true};});
+    if(Object.keys(obj).length)map.set(rn,obj);});
+  return {name:'기초데이터',path:'(붙여넣기)',dimension:`A1:T${rows.length}`,rows:map};
+}
+function s98EmptySheet(name){return {name,path:'(붙여넣기 없음)',dimension:'',rows:new Map()};}
+const _s98ParseXlsxBuffer=parseXlsxBuffer;
+parseXlsxBuffer=async function(buf){
+  const p=S98_PASTE_BUFFERS.get(buf);
+  if(p)return {sheets:{'기초데이터':p.sheet,'예산편성부서':s98EmptySheet('예산편성부서'),'계약근거':s98EmptySheet('계약근거'),'기타사항':s98EmptySheet('기타사항')},date1904:false,expandedBytes:p.chars*2};
+  return _s98ParseXlsxBuffer(buf);
+};
+function s98TimestampLabel(){const d=new Date(),z=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${z(d.getMonth()+1)}-${z(d.getDate())} ${z(d.getHours())}:${z(d.getMinutes())}`;}
+async function s98AnalyzePasted(){
+  const ta=$('#s98PasteText'),info=$('#s98PasteInfo');const text=ta?.value||'';
+  const fail=msg=>{importPreviewState={file:null,fileName:'',fileHash:'',workbook:null,rows:[],duplicateBatchId:null,isModifiedCandidate:false,summary:null};renderImportPreview();if(info)info.textContent='분석 실패';const d=document.createElement('div');d.className='validation error';d.textContent=msg;$('#importWarnings').replaceChildren(d);toast('붙여넣기 분석 실패: '+msg,'error',7000);};
+  try{
+    if(!text.trim())return fail('엑셀에서 복사한 표를 먼저 붙여넣으세요.');
+    if(text.length>S98_PASTE_MAX_CHARS)return fail(`붙여넣은 내용이 ${(S98_PASTE_MAX_CHARS/1024/1024).toFixed(0)}MB(글자 수 기준) 한도를 초과합니다.`);
+    const rows=s98ParseTsv(text);
+    if(rows.length<2)return fail('머리글 행과 계약 행이 함께 있어야 합니다. ‘기초데이터’ 시트의 A1(부서명)부터 마지막 행까지 복사하세요.');
+    const width=Math.max(...rows.map(r=>r.length));
+    if(width<20)return fail(`열이 ${width}개만 들어왔습니다. A열(부서명)부터 T열(자동계약 연장여부)까지 20개 열을 모두 선택해 복사하세요.`);
+    const first=normalizeText(rows[0][0]);if(first!=='부서명')return fail(`첫 칸이 ‘${first||'(공란)'}’입니다. 머리글 행(A1 ‘부서명’)부터 복사하세요.`);
+    const normalized=rows.map(r=>r.slice(0,20).map(c=>String(c)).join('\t')).join('\n');
+    const bytes=new TextEncoder().encode(normalized);const buf=bytes.buffer;
+    S98_PASTE_BUFFERS.set(buf,{sheet:s98BuildSheet(rows),chars:normalized.length});
+    const label=`붙여넣기_기초데이터_${s98TimestampLabel()}`;
+    const pseudo={__s98paste:true,__s98buf:buf,name:label+'.xlsx',size:bytes.length,arrayBuffer:async()=>buf};
+    if(info)info.textContent='분석 중...';
+    const res=await analyzeXlsxFile(pseudo);
+    res.fileName=label;res.file={name:label,size:bytes.length};res.summary.sheets='붙여넣기';res.summary.source='paste';
+    importPreviewState=res;
+    $('#xlsxFileInfo').textContent=`${label} · 붙여넣기 ${rows.length-1}행 · 내용 SHA-256 ${res.fileHash.slice(0,20)}…`;
+    if(info)info.textContent=`분석 완료: 계약행 ${res.rows.length}건. 아래 미리보기를 확인한 뒤 [이관 실행]을 누르세요.`;
+    renderImportPreview();
+    const warn=$('#importWarnings');if(warn){const d=document.createElement('div');d.className='validation warn';d.textContent='붙여넣기 이관: 엑셀 화면에 보이는 값으로 가져옵니다. 수식은 계산된 값만 들어오며, 예산편성부서·계약근거·기타사항 시트는 함께 가져오지 않습니다. 날짜가 2026-01-31 같은 형식이 아니면 검토대기로 표시됩니다.';warn.prepend(d);}
+  }catch(e){fail(e.message);}
+}
+
+/* ---------- 3) 화면 ---------- */
+function s98InjectUi(){
+  const anchor=$('#xlsxFileInput')?.closest('.card');if(!anchor||$('#s98PasteCard'))return;
+  const card=document.createElement('div');card.className='card card-pad mt12';card.id='s98PasteCard';
+  card.innerHTML=`<h3 class="card-title">엑셀 붙여넣기 이관 <span class="tag">DRM 파일용</span></h3><p class="help">문서보안(DRM) 때문에 파일 업로드가 안 될 때 씁니다. 엑셀에서 ‘기초데이터’ 시트를 열고 <b>A1(부서명)부터 마지막 계약 행의 T열까지</b> 선택해 복사(Ctrl+C)한 뒤, 아래 칸을 누르고 붙여넣기(Ctrl+V) 하세요. 분석·미리보기·이관 실행 절차는 파일 이관과 같습니다.</p><textarea id="s98PasteText" rows="6" spellcheck="false" placeholder="여기에 붙여넣기 (Ctrl+V)" style="width:100%;font-family:ui-monospace,Consolas,monospace;font-size:12px;white-space:pre;overflow:auto"></textarea><div class="stack mt12"><button type="button" class="btn primary" id="s98PasteAnalyzeBtn">붙여넣은 내용 분석</button><button type="button" class="btn secondary" id="s98PasteClearBtn">지우기</button><span class="muted" id="s98PasteInfo"></span></div>`;
+  anchor.after(card);
+}
+s98InjectUi();
+const _s98BindEvents=bindEvents;
+bindEvents=function(){_s98BindEvents();
+  $('#s98PasteAnalyzeBtn')?.addEventListener('click',s98AnalyzePasted);
+  $('#s98PasteClearBtn')?.addEventListener('click',()=>{$('#s98PasteText').value='';$('#s98PasteInfo').textContent='';});
+  $('#s98PasteText')?.addEventListener('input',()=>{const t=$('#s98PasteText').value;const n=t?s98ParseTsv(t).length:0;$('#s98PasteInfo').textContent=n?`붙여넣은 줄 ${n}개(머리글 포함)`:'';});
+};
+const _s98Boot=boot;
+boot=async function(){await _s98Boot();if(window.__CM_TEST__)Object.assign(window.__CM_TEST__,{s98ParseTsv:t=>s98ParseTsv(t),s98ToIsoDate:v=>s98ToIsoDate(v),S98_DRM_MESSAGE});};
 
 /* ==========================================================
    UI 개선 레이어 (v1.4.1 UI)
